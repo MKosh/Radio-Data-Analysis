@@ -1,7 +1,8 @@
+using Dates
 using HTTP, SQLite, DataFrames, JSONTables, Plots
 
 ################################################################################
-###
+### DataFrame:
 function InitializeDF(newDF, dbFile="radio.db", dbTable="tracks")
     if (newDF)
         source = HTTP.get("https://nowplaying.bbgi.com/WMMRFM/list?limit=1000&amp;offset=0")
@@ -18,7 +19,7 @@ function InitializeDF(newDF, dbFile="radio.db", dbTable="tracks")
 end
 
 ################################################################################
-###
+### DataFrame:
 function InitialDFClean(df)
     select!(df,Not(:id))
     select!(df,Not(:site))
@@ -33,14 +34,14 @@ function InitialDFClean(df)
 end
 
 ################################################################################
-###
+### SQL:
 function CreateDatabase(DBname::String)
     db = SQLite.DB(DBname)
     return db
 end
 
 ################################################################################
-###
+### SQL:
 function CreateTable(db, tableName::String)
     command = string("CREATE TABLE IF NOT EXISTS ", tableName, "(artist TEXT, title TEXT,
         date_played TEXT, time_played TEXT, timestamp INTEGER, createdOn TEXT)")
@@ -49,7 +50,7 @@ function CreateTable(db, tableName::String)
 end
 
 ################################################################################
-###
+### SQL:
 function DropTable(db, tableName::String)
     command = string("DROP TABLE IF EXISTS ", tableName)
     DBInterface.execute(db, command)
@@ -57,7 +58,7 @@ function DropTable(db, tableName::String)
 end
 
 ################################################################################
-###
+### SQL:
 function FillDatabase(df, db, tableName::String)
     for i in 1:nrow(df)
         artist_i = replace(df.artist[i], "'" => "")
@@ -71,7 +72,7 @@ function FillDatabase(df, db, tableName::String)
 end
 
 ################################################################################
-###
+### SQL:
 function CountPlays(db, tableName)
     command = string("SELECT",
                         " artist,",
@@ -89,7 +90,7 @@ function CountPlays(db, tableName)
 end
 
 ################################################################################
-###
+### SQL:
 function MostPlayedSongs(db, tableName, limit)
     command = string("SELECT",
                         " artist,",
@@ -110,7 +111,7 @@ function MostPlayedSongs(db, tableName, limit)
 end
 
 ################################################################################
-###
+### SQL:
 function MostPlayedArtists(db, tableName, limit)
     command = string("SELECT",
                         " artist,",
@@ -129,7 +130,7 @@ function MostPlayedArtists(db, tableName, limit)
 end
 
 ################################################################################
-###
+### SQL:
 function DeleteDups(db, tableName::String)
     command = string("DELETE",
                     " FROM",
@@ -148,11 +149,38 @@ function DeleteDups(db, tableName::String)
 end
 
 ################################################################################
-###
+### SQL: Get times played for a band
+#test = DBInterface.execute(database, "SELECT time_played, COUNT(*) AS count 
+#FROM tracks WHERE artist='Foo Fighters' GROUP BY time_played ORDER BY count DESC LIMIT 10") |> DataFrame
+function ArtistPlaysByTime(db, tableName::String, Artist::String)
+    command = string("SELECT",
+                        " time_played,",
+                        " COUNT (*) AS count",
+                    " FROM",
+                        " tracks",
+                    " WHERE",
+                        " artist='Foo Fighters'",
+                    " GROUP BY",
+                        " time_played")
+    df = DBInterface.execute(db, command) |> DataFrame
+    return df
+end
+
+################################################################################
+### Plots:
 function barPlot(df, x, y, column, limit)
     plotTitle = string("Top ", limit, " ", names(df, column)[1], " Played")
+    println("\n", "Plots", " "^6, ": Plotting ", plotTitle)
     bar(x, y, xticks=:all, xrotation=45, ylabel="Counts", title=plotTitle,
         legend=false, size=(1000,800))
+    gui()
+    return nothing
+end
+
+################################################################################
+### Plots:86399000000000, 88199000000000,
+function histoTimePlot(df, x)
+    histogram(Dates.Time.(x, "HH:MM:SS.sss"), bins=0:3.6e12:9.0e13, xrotation=45, xlims=(0, 89999000000000), legend=false)
     gui()
     return nothing
 end
@@ -189,10 +217,13 @@ println("")
 show(dataframe)
 println("")
 
-topArtists = MostPlayedArtists(database, table, num_entries)
-barPlot(topArtists, topArtists.artist, topArtists.count, 1, num_entries)
-savefig("plots/Top_Artists_9_11-9_15.pdf")
+test = ArtistPlaysByTime(database, table, "foo")
+histoTimePlot(test, test.time_played)
 
-topSongs = MostPlayedSongs(database, table, num_entries)
-barPlot(topSongs, topSongs.title, topSongs.count, 2, num_entries)
-savefig("plots/Top_Songs_9_11-9_15.pdf")
+#topArtists = MostPlayedArtists(database, table, num_entries)
+#barPlot(topArtists, topArtists.artist, topArtists.count, 1, num_entries)
+#savefig("plots/Top_Artists.pdf")
+#
+#topSongs = MostPlayedSongs(database, table, num_entries)
+#barPlot(topSongs, topSongs.title, topSongs.count, 2, num_entries)
+#savefig("plots/Top_Songs.pdf")
