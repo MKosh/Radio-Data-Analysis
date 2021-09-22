@@ -226,7 +226,7 @@ end
 database_file   = "radio.db"
 table          = "tracks"
 num_entries    = 25
-getting_new_data = false
+getting_new_data = true
 
 if (isfile(database_file) && !getting_new_data)
     println("\n","SQL"," "^8, ": Opening Database: ", database_file)
